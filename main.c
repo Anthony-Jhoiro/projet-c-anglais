@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <time.h>
 #include "colors.h"
 
 
@@ -171,66 +172,109 @@ void magic(character *from, character* to) {
     characterIncMana(from, -5);
 }
 
-void fight(character *player, character *opponent) {
+int choseAttackRandom(character *attacker) {
+    if (attacker->mana < 5) {
+        return 0;
+    }
+    return 1 + rand() % 2;
+}
+
+int choseAttack(character *attacker) {
+    int choice;
+    printf("1. Hit\n2. Magic\n");
+
+    scanf("%1d", &choice);
+
+    while (choice != 1 && choice != 2) {
+        printf("Invalid choice, try again :\n");
+        scanf("%1d", &choice);
+
+        if (choice == 2 && attacker->mana < 5) {
+            printf("Not enough mana.\n");
+            choice = 0;
+        }
+
+    }
+    return choice;
+}
+
+int attack(character *from, character *to, int attackType) {
+    if (attackType == 2) {
+        printf("%s use magic !\n", from->name);
+        magic(from, to);
+    } else {
+        printf("%s use physical attack !\n", from->name);
+        hit(from, to);
+    }
+
+    return to->pv <= 0;
+}
+
+
+int fight(character *player, character *opponent) {
 
 
     do {
         printf("%s", characterToString(*player));
         printf("%s", characterToString(*opponent));
 
-        printf("1. Hit\n2. Magic\n");
+        // Player turn
+        int playerAttack = choseAttack(player);
+        if (attack(player, opponent, playerAttack)) {
+            printf("You won !\n");
+            return 1;
+        }
 
-        int choice;
-        scanf("%1d", &choice);
-
-        if (choice == 2) {
-            printf("You use magic !\n");
-            magic(player, opponent);
-        } else {
-            printf("You use physical attack !\n");
-            hit(player, opponent);
+        // Opponent turn
+        int opponentAttack = choseAttackRandom(opponent);
+        if (attack(opponent, player, opponentAttack)) {
+            printf("You lost...\n");
+            return 0;
         }
     } while (player->pv > 0 && opponent->pv > 0);
 
-    if (opponent->pv <= 0) {
-        printf("You won !\n");
-    } else {
-        printf("You lost...\n");
-    }
-
 }
 
-void initiateFight(character *player, char* line) {
+int initiateFight(character *player, char* line) {
     char name[20];
     int pv;
     int mana;
-    int magicPower;
     int physicalPower;
-    bool scanSucceed = sscanf(line, "#%20s %d %d %d %d", name, &pv, &mana, &magicPower, &physicalPower);
+    int magicPower;
+    bool scanSucceed = sscanf(line, "#%20s %d %d %d %d", name, &pv, &mana, &physicalPower, &magicPower);
     if (! scanSucceed) {
         throw("Invalid definition");
     }
 
     character *opponent = newOpponent(name, pv, mana, magicPower, physicalPower);
 
-    fight(player, opponent);
+    return fight(player, opponent);
 }
 
+int lost() {
+    printf("Sadly you lost, thanks for playing !");
+    exit(1);
+}
+
+int win() {
+    printf("You won the adventure !");
+    exit(0);
+}
+
+
+
 int main() {
+    srand(time(NULL));
     character *c = newCharacter("Toto");
-//    printf("%s", characterToString(*c));
 
     FILE *file = fopen("script.txt", "r");
-
-//    char buff[256];
-//    char buff2[256];
 
     char *line = NULL;
     size_t len = 0;
     int lineCount = 0;
 
     for (ssize_t read; read != EOF; read = getline(&line, &len, file)) {
-        if (len == 0 || line[0] == '\n' || line[0] == ' ')  continue;
+        if (len == 0 || line[0] == '\n' || line[0] == ' ') continue;
         if (line[0] == '>') {
             char *nextLine;
             int nextLineLength;
@@ -240,23 +284,14 @@ int main() {
             }
             dialogIn(line, nextLine);
         } else if (line[0] == '#') {
-            initiateFight(c, line);
+            if (!initiateFight(c, line)) {
+                lost();
+            }
         }
 
-//        if (prefix != '>') {
-//            if () {
-//                return 1;
-//            }
-//        }
-//        printf("line founded : %c", prefix);
-//        fscanf(file, "[%s] %s", buff, buff2);
-//
-//        printf("Received : %s - %s", buff, buff2);
     }
 
-//    fscanf(file, "> [%s] %s", buff, buff2);
-//
-//    printf("Received : %s - %s", buff, buff2);
+    win();
 
 
     return 0;
